@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nhl_fantasy
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/nhl_fantasy
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+
+volumes:
+  postgres_data:
