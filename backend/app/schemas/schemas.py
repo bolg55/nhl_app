@@ -35,13 +35,25 @@ class PlayerStats(PlayerStatsBase):
         from_attributes = True
 
 class LeagueSettingsBase(BaseModel):
+    # Salary constraints
     max_salary_cap: float
+    min_salary_cap_pct: float = 0.99  # Default 99% of max
+
+    # Roster requirements
     num_forwards: int
     num_defense: int
     num_goalies: int
+    max_players_per_team: int = 5
+
+    # Scoring settings
     points_goal: float
     points_assist: float
     points_goalie_win: float
+
+    # Optional additional settings
+    min_forwards_per_team: int = 0  # If you want to require min forwards from same team
+    max_forwards_per_team: int = None  # If you want to limit forwards from same team
+    max_defense_per_team: int = 1  # Your current 1 defenseman per team rule
 
 class LeagueSettingsCreate(LeagueSettingsBase):
     pass
