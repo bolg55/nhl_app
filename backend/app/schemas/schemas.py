@@ -51,3 +51,19 @@ class LeagueSettings(LeagueSettingsBase):
 
     class Config:
         from_attributes = True
+
+class OptimizedPlayer(BaseModel):
+    id: int
+    name: str
+    team: str
+    position: str
+    projected_points: float
+    salary: float
+    games_this_week: int
+
+class OptimizedLineup(BaseModel):
+    forwards: List[OptimizedPlayer]
+    defense: List[OptimizedPlayer]
+    goalies: List[OptimizedPlayer]
+    total_points: float
+    total_salary: float
