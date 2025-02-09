@@ -19,12 +19,13 @@ async def optimize_lineup(
     Optionally exclude or force certain players.
     """
     try:
-        lineup = await optimizer.generate_optimal_lineup(
+        optimizer_instance = optimizer.FantasyOptimizer(
             db=db,
             settings=settings,
             exclude_players=exclude_players,
             force_players=force_players
         )
+        lineup = await optimizer_instance.optimize()
         return lineup
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
