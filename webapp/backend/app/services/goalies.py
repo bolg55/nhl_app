@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 import pandas as pd
 from typing import Dict, Tuple
-from ..core.constants import FANTASY_POINTS
+from ..core.constants import GOALIE_WIN, SHUTOUT, OT_LOSS
 
 class GoalieService:
     def __init__(self, db: Session):
@@ -11,9 +11,9 @@ class GoalieService:
         self,
         multipliers: Dict[str, float],
         games_count: Dict[str, int],
-        win_points: float = FANTASY_POINTS['GOALIE_WIN'],
-        shutout_bonus: float = FANTASY_POINTS['SHUTOUT'],
-        ot_loss_points: float = FANTASY_POINTS['OT_LOSS'],
+        win_points: float = GOALIE_WIN,
+        shutout_bonus: float = SHUTOUT,
+        ot_loss_points: float = OT_LOSS,
         avg_shutout_freq: float = 0.05,
         avg_ot_loss_freq: float = 0.1
     ) -> Dict[str, Tuple[float, int]]:

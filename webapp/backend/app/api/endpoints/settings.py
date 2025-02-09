@@ -25,7 +25,7 @@ async def get_default_settings():
         "points_ot_loss": OT_LOSS,
         "max_defense_per_team": 1,
         "min_forwards_per_team": 0,
-        "max_forwards_per_team": None,
+        "max_forwards_per_team": 3,
     }
 
 @router.post("/", response_model=schemas.LeagueSettings)

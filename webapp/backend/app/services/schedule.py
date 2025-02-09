@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import pandas as pd
-from ..models import models
-from ..core.config import TEAM_ABBREVIATIONS, CURRENT_YEAR
+from app.models import models
+from app.core.constants import TEAM_ABBREVIATIONS, CURRENT_YEAR
+
 
 async def fetch_game_data(year: int):
     """Fetches NHL games and teams involved for a given year."""

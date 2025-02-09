@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
 from typing import List, Optional
 
@@ -52,14 +52,14 @@ class LeagueSettingsBase(BaseModel):
 
     # Optional additional settings
     min_forwards_per_team: int = 0  # If you want to require min forwards from same team
-    max_forwards_per_team: int = None  # If you want to limit forwards from same team
+    max_forwards_per_team: int = int | None  # If you want to limit forwards from same team
     max_defense_per_team: int = 1  # Your current 1 defenseman per team rule
 
 class LeagueSettingsCreate(LeagueSettingsBase):
     pass
 
 class LeagueSettings(LeagueSettingsBase):
-    id: int
+    id: Optional[int] = Field(None, example=1)
 
     class Config:
         from_attributes = True

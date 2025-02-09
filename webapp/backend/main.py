@@ -21,7 +21,7 @@ app.add_middleware(
 app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(optimize.router, prefix="/api/optimize", tags=["optimize"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
-app.include_router(status.router, prefix="/api/status", tags=["status"])
+# app.include_router(status.router, prefix="/api/status", tags=["status"])
 
 @app.get("/")
 async def root():

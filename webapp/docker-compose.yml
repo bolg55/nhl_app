@@ -12,6 +12,7 @@ services:
 
   api:
     build:
+      # Update context to point to backend inside webapp
       context: ./backend
       dockerfile: Dockerfile
     ports:
@@ -21,6 +22,7 @@ services:
     depends_on:
       - db
     volumes:
+      # Update volume path to point to backend inside webapp
       - ./backend:/app
 
 volumes:

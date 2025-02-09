@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session
 from app.schemas import schemas
 from app.models import models
-from app.services.injuries import get_current_injuries, InjuryService
-from app.services.salary import get_player_salaries, SalaryService
-from app.services.goalies import GoalieService
-from app.services.schedule import get_weekly_schedule_info
-from app.services.projections import create_player_features, get_projection_weights, calculate_weighted_projections
+from .injuries import InjuryService
+from .salary import SalaryService
+from .goalies import GoalieService
+from .schedule import get_weekly_schedule_info
+from .projections import ProjectionService
 import pulp
 import pandas as pd
 from datetime import date, timedelta
@@ -27,6 +27,7 @@ class FantasyOptimizer:
         self.injury_service = InjuryService(db)
         self.salary_service = SalaryService(db)
         self.goalie_service = GoalieService(db)
+        self.projection_service = ProjectionService(db)
 
         # Constants
         self.MAX_COST = settings.max_salary_cap
@@ -128,15 +129,15 @@ class FantasyOptimizer:
                 raise ValueError("No remaining games this week to optimize")
 
             # Get initial features
-            player_features = await create_player_features(player_data)
+            player_features = await self.projection_service.create_player_features(player_data)
             if player_features.empty:
                 raise ValueError("Failed to create player features")
 
             # Get weights based on time of season
-            weights = get_projection_weights()
+            weights = self.projection_service.get_projection_weights()
 
             # Calculate weighted projections
-            projections = await calculate_weighted_projections(player_features, weights)
+            projections = await self.projection_service.calculate_weighted_projections(player_features, weights)
 
             # Add schedule impact
             projections['games_this_week'] = projections['Team'].map(games_count)
@@ -155,7 +156,7 @@ class FantasyOptimizer:
             projections = projections[projections['Team'].isin(active_teams)]
 
             # Add injury information
-            injuries_df = await get_current_injuries()
+            injuries_df = await self.injury_service.get_current_injuries()
             if not injuries_df.empty:
                 projections = projections.merge(
                     injuries_df[['Player', 'Injury Status']],
@@ -166,7 +167,7 @@ class FantasyOptimizer:
                 projections.loc[projections['Injured'], 'proj_fantasy_pts'] = 0
 
             # Add salary information
-            salary_df = await get_player_salaries(self.db)
+            salary_df = await self.salary_service.get_player_salaries(self.db)
             projections = projections.merge(
                 salary_df[['Player', 'Team', 'pv']],
                 on=['Player', 'Team'],
