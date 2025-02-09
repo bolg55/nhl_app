@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.schemas import schemas
+from app.core.constants import MAX_COST, MIN_COST, NUM_FORWARDS, NUM_DEFENSE, NUM_GOALIES, MAX_PLAYERS_PER_TEAM, GOAL, ASSIST, GOALIE_WIN, SHUTOUT, OT_LOSS
 
 router = APIRouter()
 
@@ -11,15 +12,17 @@ async def get_default_settings():
     Get default league settings
     """
     return {
-        "max_salary_cap": 63.0,
-        "min_salary_cap_pct": 0.99,
-        "num_forwards": 6,
-        "num_defense": 4,
-        "num_goalies": 2,
-        "max_players_per_team": 5,
-        "points_goal": 2.0,
-        "points_assist": 1.0,
-        "points_goalie_win": 2.0,
+        "max_salary_cap": MAX_COST,
+        "min_salary_cap_pct": MIN_COST,
+        "num_forwards": NUM_FORWARDS,
+        "num_defense": NUM_DEFENSE,
+        "num_goalies": NUM_GOALIES,
+        "max_players_per_team": MAX_PLAYERS_PER_TEAM,
+        "points_goal": GOAL,
+        "points_assist": ASSIST,
+        "points_goalie_win": GOALIE_WIN,
+        "points_shutout": SHUTOUT,
+        "points_ot_loss": OT_LOSS,
         "max_defense_per_team": 1,
         "min_forwards_per_team": 0,
         "max_forwards_per_team": None,
