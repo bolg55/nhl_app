@@ -2,14 +2,93 @@
 from datetime import date
 from sqlalchemy.orm import Session
 import pandas as pd
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from app.core.constants import SEASON_START
+from app.core.data_sources import DataService
 
 class ProjectionService:
     def __init__(self,db: Session, season_start: str = SEASON_START):
         self.db = db
         self.season_start = season_start
+        self.data_service = DataService(db)
 
+    async def get_weekly_lineup(self, schedule_service, goalie_service) -> pd.DataFrame:
+        """Main method to generate weekly lineup"""
+        try:
+            # Get base data
+            player_data, salary_data, standings_data = await self.get_projection_data()
+            if player_data.empty or salary_data.empty or standings_data.empty:
+                raise ValueError("Failed to fetch required data")
+
+
+            # Get schedule information
+            games_count, multipliers = await schedule_service.get_schedule_info()
+
+            # Player projections
+            player_projections = await self.calculate_projections(player_data,games_count,multipliers)
+
+            # Merge with salary data
+            merged_projections = await self.merge_with_salaries(player_projections,salary_data)
+
+            # Get goalie projections
+            goalie_data = await goalie_service.estimate_team_goaltending_points(multipliers,games_count)
+            goalie_df = await goalie_service.create_goalie_dataframe(goalie_data)
+
+            # Combine player and goalie projections
+            final_projections = pd.concat([merged_projections,goalie_df],ignore_index=True)
+
+            return final_projections.dropna()
+        except Exception as e:
+            print(f"Error generating weekly lineup: {e}")
+            return pd.DataFrame()
+
+
+    async def get_projection_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Get all data needed for projections"""
+        try:
+            player_data, salary_data, standings_data = await self.data_service.get_optimization_data()
+
+            player_features = await self.create_player_features(player_data)
+            normalized_data = self.normalize_data(player_features)
+
+            return normalized_data, salary_data, standings_data
+        except Exception as e:
+            print(f"Error fetching projection data: {e}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    def normalize_data(self,df: pd.DataFrame) -> pd.DataFrame:
+        """Normalize data for optimization"""
+        # Normalize player names
+        df['Player_upper'] = df['Player'].str.upper()
+
+        # Normalize positions
+        df['Position'] = df['raw_position'].map(
+            lambda x: 'F' if x in ['C', 'L', 'R', 'LW','RW'] else x
+        )
+
+        return df
+
+    async def merge_with_salaries(self, projections: pd.DataFrame, salary_df: pd.DataFrame) -> pd.DataFrame:
+        """Merge projections with salary data"""
+        if salary_df.empty:
+            print("No salary data provided")
+            return projections
+
+        # Normalize player names
+        salary_df['Player_upper'] = salary_df['Player'].str.upper()
+
+        # Merge projections with salary data
+        merged_df = projections.merge(
+            salary_df[['Player_upper', 'Team', 'Position', 'pv']],
+            on=['Player_upper', 'Team'],
+            how='inner',
+            suffixes=('_orig', '')
+        )
+
+        # Clean up
+        merged_df = merged_df.drop(['Player_upper', 'Position_orig'], axis=1)
+
+        return merged_df
 
     async def create_player_features(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
@@ -72,51 +151,6 @@ class ProjectionService:
             print(f"Error processing player features: {e}")
             return pd.DataFrame()
 
-    async def calculate_projections(
-        self,
-        player_stats: pd.DataFrame,
-        games_count: Dict[str, int],
-        multipliers: Dict[str, float]
-    ) -> pd.DataFrame:
-        df = player_stats.copy()
-
-        # Add schedule info
-        df['games_this_week'] = df['Team'].map(games_count).fillna(0)
-        df['schedule_multiplier'] = df['Team'].map(multipliers).fillna(999.0)
-
-        # Calculate base projections per game
-        df['proj_goals_per_game'] = (
-            0.4 * df['Goals/60'] +
-            0.3 * df['Goals/60_rolling_5'] +
-            0.3 * df['Goals/60_rolling_10']
-        ) * (df['TOI/GP'] / 60)
-
-        df['proj_assists_per_game'] = (
-            0.4 * df['Total Assists/60'] +
-            0.3 * df['Total Assists/60_rolling_5'] +
-            0.3 * df['Total Assists/60_rolling_10']
-        ) * (df['TOI/GP'] / 60)
-
-        # Fill NaN values with 0
-        df['proj_goals_per_game'] = df['proj_goals_per_game'].fillna(0)
-        df['proj_assists_per_game'] = df['proj_assists_per_game'].fillna(0)
-
-        # Calculate final fantasy points
-        df['proj_fantasy_pts'] = (
-            (df['proj_goals_per_game'] * 2 +
-            df['proj_assists_per_game'] * 1) *
-            df['games_this_week'] *
-            df['schedule_multiplier']
-        )
-
-        # Check for any remaining NaN values
-        null_values = df[df['proj_fantasy_pts'].isnull()]
-        if not null_values.empty:
-            print("\nRows with null projections:")
-            print(null_values[['Player', 'Team', 'Position', 'games_this_week', 'schedule_multiplier',
-                            'proj_goals_per_game', 'proj_assists_per_game']].head())
-
-        return df
 
     def get_projection_weights(self) -> Dict[str, float]:
         """
@@ -165,66 +199,89 @@ class ProjectionService:
     async def calculate_weighted_projections(
         self,
         df: pd.DataFrame,
-        weights: Dict[str, float]
+        games_count: Dict[str, int],
+        multipliers: Dict[str, float]
     ) -> pd.DataFrame:
-        # Keep key identifying columns
-        key_columns = ['Player', 'Team', 'Position', 'TOI/GP']
-        base_df = df[key_columns].drop_duplicates()
+        """Calculate player projections with schedule adjustments"""
+        try:
+            # Keep key identifying columns
+            key_columns = ['Player', 'Team', 'Position', 'TOI/GP']
+            base_df = df[key_columns].drop_duplicates()
 
-        # Split data into current and historical
-        current_season = df[df['Date'] >= self.season_start].copy()
-        historical = df[df['Date'] < self.season_start].copy()
+            # Split data into current and historical
+            current_season = df[df['Date'] >= self.season_start].copy()
+            historical = df[df['Date'] < self.season_start].copy()
 
-        # Calculate different stat bases based on available data
-        stats = ['Goals/60', 'Total Assists/60']
-        projections = {}
+            # Get appropriate weights based on time of season
+            weights = self.get_projection_weights()
 
-        for stat in stats:
-            if 'current_season' in weights and not current_season.empty:
-                # Current season stats
-                current_avg = current_season.groupby('Player')[stat].mean()
-                rolling_5 = current_season.groupby('Player')[stat].transform(
-                    lambda x: x.rolling(5, min_periods=1).mean()
-                ).groupby(current_season['Player']).last()  # Take last value for each player
-                rolling_10 = current_season.groupby('Player')[stat].transform(
-                    lambda x: x.rolling(10, min_periods=1).mean()
-                ).groupby(current_season['Player']).last()  # Take last value for each player
+            # Calculate different stat bases based on available data
+            stats = ['Goals/60', 'Total Assists/60']
+            projections = {}
 
-            if not historical.empty:
-                # Historical stats
-                last_season = historical.groupby('Player')[stat].last()
-                career_avg = historical.groupby('Player')[stat].mean()
-                last_20 = historical.groupby('Player')[stat].transform(
-                    lambda x: x.tail(20).mean()
-                ).groupby(historical['Player']).last()  # Take last value for each player
+            for stat in stats:
 
-            # Initialize projection with zeros
-            projection = pd.Series(0, index=base_df['Player'].unique())
+                # Initialize projection with zeros
+                projection = pd.Series(0, index=base_df['Player'].unique())
 
-            for weight_type, weight in weights.items():
-                if weight_type == 'current_season' and 'current_avg' in locals():
-                    projection += weight * current_avg.fillna(0)
-                elif weight_type == 'rolling_5' and 'rolling_5' in locals():
-                    projection += weight * rolling_5.fillna(0)
-                elif weight_type == 'rolling_10' and 'rolling_10' in locals():
-                    projection += weight * rolling_10.fillna(0)
-                elif weight_type == 'last_season' and 'last_season' in locals():
-                    projection += weight * last_season.fillna(0)
-                elif weight_type == 'career' and 'career_avg' in locals():
-                    projection += weight * career_avg.fillna(0)
-                elif weight_type == 'last_20_games' and 'last_20' in locals():
-                    projection += weight * last_20.fillna(0)
+                if 'current_season' in weights and not current_season.empty:
+                    # Current season stats
+                    current_avg = current_season.groupby('Player')[stat].mean()
+                    rolling_5 = current_season.groupby('Player')[stat].transform(
+                        lambda x: x.rolling(5, min_periods=1).mean()
+                    ).groupby(current_season['Player']).last()  # Take last value for each player
+                    rolling_10 = current_season.groupby('Player')[stat].transform(
+                        lambda x: x.rolling(10, min_periods=1).mean()
+                    ).groupby(current_season['Player']).last()  # Take last value for each player
 
-            projections[stat] = projection
+                if not historical.empty:
+                    # Historical stats
+                    last_season = historical.groupby('Player')[stat].last()
+                    career_avg = historical.groupby('Player')[stat].mean()
+                    last_20 = historical.groupby('Player')[stat].transform(
+                        lambda x: x.tail(20).mean()
+                    ).groupby(historical['Player']).last()  # Take last value for each player
 
-        # Create final projections DataFrame
-        proj_df = pd.DataFrame(projections)
+                for weight_type, weight in weights.items():
+                    if weight_type == 'current_season' and 'current_avg' in locals():
+                        projection += weight * current_avg.fillna(0)
+                    elif weight_type == 'rolling_5' and 'rolling_5' in locals():
+                        projection += weight * rolling_5.fillna(0)
+                    elif weight_type == 'rolling_10' and 'rolling_10' in locals():
+                        projection += weight * rolling_10.fillna(0)
+                    elif weight_type == 'last_season' and 'last_season' in locals():
+                        projection += weight * last_season.fillna(0)
+                    elif weight_type == 'career' and 'career_avg' in locals():
+                        projection += weight * career_avg.fillna(0)
+                    elif weight_type == 'last_20_games' and 'last_20' in locals():
+                        projection += weight * last_20.fillna(0)
 
-        # Merge projections with base information
-        final_df = base_df.merge(proj_df, left_on='Player', right_index=True, how='left')
+                projections[stat] = projection
 
-        # Calculate per-game projections
-        final_df['proj_goals_per_game'] = (final_df['Goals/60'] * (final_df['TOI/GP'] / 60)).fillna(0)
-        final_df['proj_assists_per_game'] = (final_df['Total Assists/60'] * (final_df['TOI/GP'] / 60)).fillna(0)
+            # Create final projections DataFrame
+            proj_df = pd.DataFrame(projections)
 
-        return final_df
+            # Merge projections with base information
+            final_df = base_df.merge(proj_df, left_on='Player', right_index=True, how='left')
+
+            # Calculate per-game projections
+            final_df['proj_goals_per_game'] = (final_df['Goals/60'] * (final_df['TOI/GP'] / 60)).fillna(0)
+            final_df['proj_assists_per_game'] = (final_df['Total Assists/60'] * (final_df['TOI/GP'] / 60)).fillna(0)
+
+            # Add schedule adjustments
+            final_df['games_this_week'] = final_df['Team'].map(games_count).fillna(0)
+            final_df['schedule_multiplier'] = final_df['Team'].map(multipliers).fillna(999.0)
+
+            final_df['proj_fantasy_pts'] = (
+                    (final_df['proj_goals_per_game'] * 2 +
+                    final_df['proj_assists_per_game'] * 1) *
+                    final_df['games_this_week'] *
+                    final_df['schedule_multiplier']
+                )
+
+
+            return final_df
+
+        except Exception as e:
+            print(f"Error calculating player projections: {e}")
+            return pd.DataFrame()

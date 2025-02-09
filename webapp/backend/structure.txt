@@ -1,0 +1,39 @@
+.
+├── app
+│   ├── api
+│   │   ├── deps.py
+│   │   ├── endpoints
+│   │   │   ├── __init__.py
+│   │   │   ├── optimize.py
+│   │   │   ├── players.py
+│   │   │   ├── settings.py
+│   │   │   └── status.py
+│   │   └── __init__.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── constants.py
+│   │   └── __init__.py
+│   ├── database.py
+│   ├── __init__.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   └── models.py
+│   ├── schemas
+│   │   ├── __init__.py
+│   │   └── schemas.py
+│   ├── scripts
+│   │   └── init_db.py
+│   └── services
+│       ├── goalies.py
+│       ├── __init__.py
+│       ├── injuries.py
+│       ├── optimizer.py
+│       ├── projections.py
+│       ├── salary.py
+│       └── schedule.py
+├── Dockerfile
+├── main.py
+├── requirements.txt
+└── structure.txt
+
+8 directories, 28 files

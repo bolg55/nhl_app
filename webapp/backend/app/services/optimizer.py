@@ -23,6 +23,7 @@ class FantasyOptimizer:
         self.settings = settings
         self.exclude_players = exclude_players or []
         self.force_players = force_players or []
+        self.position_mapping = settings.position_mapping
 
         self.injury_service = InjuryService(db)
         self.salary_service = SalaryService(db)
@@ -119,6 +120,9 @@ class FantasyOptimizer:
             player_data = await self.get_player_data()
             if player_data.empty:
                 raise ValueError("No player data available")
+
+            # TODO: Normalize data using settings
+            # player_data['Position'] = player_data['raw_position'].map(self.position_mapping)
 
             # Get schedule info
             games_count, multipliers = await self.schedule_service.get_weekly_schedule_info()

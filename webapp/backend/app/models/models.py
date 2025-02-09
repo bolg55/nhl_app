@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, Integer, String, Float, Boolean, ForeignKey, Date
+from sqlalchemy import Column, DateTime, Integer, String, Float, Boolean, ForeignKey, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -9,10 +9,14 @@ class Player(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     team = Column(String)
-    position = Column(String)
+    raw_position = Column(String)
     stats = relationship("PlayerStats", back_populates="player")
     salaries = relationship("PlayerSalary", back_populates="player")
     injuries = relationship("PlayerInjury", back_populates="player")
+
+    __table_args__ = (
+        UniqueConstraint('name', 'team', 'position', name='unique_player_identifier'),
+    )
 
 class PlayerStats(Base):
     __tablename__ = "player_stats"
