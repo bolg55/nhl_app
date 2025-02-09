@@ -17,7 +17,21 @@ class GoalieService:
         avg_shutout_freq: float = 0.05,
         avg_ot_loss_freq: float = 0.1
     ) -> Dict[str, Tuple[float, int]]:
-        """Calculate projected goalie points for each team"""
+        """
+        Calculate projected goalie points for each team
+
+        Args:
+        multipliers (Dict[str, float]): Team strength multipliers
+        games_count (Dict[str, int]): Number of games per team
+        win_points (float): Points for a win
+        shutout_bonus (float): Points for a shutout
+        ot_loss_points (float): Points for OT loss
+        avg_shutout_freq (float): Average frequency of shutouts
+        avg_ot_loss_freq (float): Average frequency of OT losses
+
+        Returns:
+            Dict[str, Tuple[float, int]]: Team goalie projections and games
+        """
         goaltending_data = {}
 
         for team, multiplier in multipliers.items():
