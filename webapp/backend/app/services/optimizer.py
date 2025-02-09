@@ -4,7 +4,7 @@ from app.models import models
 from .injuries import InjuryService
 from .salary import SalaryService
 from .goalies import GoalieService
-from .schedule import get_weekly_schedule_info
+from .schedule import ScheduleService
 from .projections import ProjectionService
 import pulp
 import pandas as pd
@@ -28,6 +28,7 @@ class FantasyOptimizer:
         self.salary_service = SalaryService(db)
         self.goalie_service = GoalieService(db)
         self.projection_service = ProjectionService(db)
+        self.schedule_service = ScheduleService(db)
 
         # Constants
         self.MAX_COST = settings.max_salary_cap
@@ -120,7 +121,7 @@ class FantasyOptimizer:
                 raise ValueError("No player data available")
 
             # Get schedule info
-            games_count, multipliers = await get_weekly_schedule_info(self.db)
+            games_count, multipliers = await self.schedule_service.get_weekly_schedule_info()
             if not games_count:
                 raise ValueError("Failed to get schedule information")
 
@@ -167,7 +168,7 @@ class FantasyOptimizer:
                 projections.loc[projections['Injured'], 'proj_fantasy_pts'] = 0
 
             # Add salary information
-            salary_df = await self.salary_service.get_player_salaries(self.db)
+            salary_df = await self.salary_service.get_player_salaries()
             projections = projections.merge(
                 salary_df[['Player', 'Team', 'pv']],
                 on=['Player', 'Team'],

@@ -1,11 +1,15 @@
 # app/services/projections.py
 from datetime import date
+from sqlalchemy.orm import Session
 import pandas as pd
 from typing import Dict, Optional
+from app.core.constants import SEASON_START
 
 class ProjectionService:
-    def __init__(self, season_start: str):
+    def __init__(self,db: Session, season_start: str = SEASON_START):
+        self.db = db
         self.season_start = season_start
+
 
     async def create_player_features(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:

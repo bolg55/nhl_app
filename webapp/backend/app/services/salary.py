@@ -7,6 +7,7 @@ class SalaryService:
     def __init__(self, db: Session):
         self.db = db
 
+
     async def get_player_salaries(self) -> pd.DataFrame:
         """Get latest player salaries from database"""
         # Using the relationship
