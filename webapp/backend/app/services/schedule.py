@@ -7,7 +7,7 @@ from app.core.constants import TEAM_ABBREVIATIONS, CURRENT_YEAR
 class ScheduleService:
     def __init__(self, db: Session):
         self.db = db
-    async def fetch_game_data(self, year: int):
+    async def fetch_game_data(self, year: int) -> pd.DataFrame:
         """Fetches NHL games and teams involved for a given year."""
         url = f"https://www.hockey-reference.com/leagues/NHL_{year}_games.html"
         dfs = pd.read_html(url)
@@ -21,7 +21,7 @@ class ScheduleService:
 
         return game_data
 
-    async def filter_dates_for_week(self,dates, start_date):
+    async def filter_dates_for_week(self,dates, start_date) -> list:
         """Filter dates for current week's remaining games."""
         if isinstance(start_date, str):
             start_date = date.fromisoformat(start_date)
@@ -34,7 +34,7 @@ class ScheduleService:
 
         return week_dates
 
-    async def games_count_for_team_for_week(self, year: int, start_date: date):
+    async def games_count_for_team_for_week(self, year: int, start_date: date) -> dict[str, int]:
         """Get number of games per team for the week."""
         game_data = await self.fetch_game_data(year)
 
@@ -51,7 +51,7 @@ class ScheduleService:
         return total_counts
 
 
-    async def get_weekly_schedule_info(self, start_date=date.today()):
+    async def get_weekly_schedule_info(self, start_date=date.today()) -> tuple[dict[str, int], dict[str, float]]:
         """Get schedule information for remaining games this week"""
 
         # Get games per team
